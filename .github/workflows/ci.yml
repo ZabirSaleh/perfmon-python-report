@@ -1,0 +1,35 @@
+name: Python CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test (${{ matrix.os }}, Python ${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ['3.10', '3.12']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Sample CSV end-to-end smoke test
+        run: python perfmon_report.py --csv examples/sample_perfmon.csv --output ci-reports
+      - name: Verify sample output
+        shell: python
+        run: |
+          from pathlib import Path
+          report_folders = [p for p in Path('ci-reports').iterdir() if p.is_dir()]
+          assert len(report_folders) == 1, report_folders
+          expected = {'report.html', 'performance_charts.png', 'performance_data.csv', 'raw_perfmon.csv'}
+          assert expected.issubset({p.name for p in report_folders[0].iterdir()})
